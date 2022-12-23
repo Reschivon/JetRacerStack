@@ -24,7 +24,11 @@
 
         <rosparam>
             lowH: 10
-            highH: 11
+            highH: 60
+            lowS: 30
+            highS: 255
+            lowV: 60
+            highV: 180
         </rosparam>
     </node>
 </launch>
