@@ -35,7 +35,7 @@ private:
     using Point = pcl::PointXYZRGB;
     using PointHSV = pcl::PointXYZHSV;
     using CloudPtr = pcl::PointCloud<pcl::PointXYZRGB>::Ptr;
-    using CloudHSVPtr = pcl::PointCloud<pcl::PointXYZHSV>::Ptr;
+    using CloudHSVPtr = pcl::PointCloud<PointHSV>::Ptr;
 
 public:
     virtual void onInit() 
@@ -66,7 +66,7 @@ public:
 
         CloudHSVPtr hsvCloud(new pcl::PointCloud<PointHSV>);
         pcl::PointCloudXYZRGBtoXYZHSV(cloudRGBConst, *hsvCloud);
-        const pcl::PointCloud<pcl::PointXYZHSV>::ConstPtr hsvCloudConst(hsvCloud);
+        const pcl::PointCloud<PointHSV>::ConstPtr hsvCloudConst(hsvCloud);
         
         CloudHSVPtr cloud_filtered(new pcl::PointCloud<PointHSV>);
         
@@ -74,20 +74,20 @@ public:
         range_cond->addComparison(pcl::FieldComparison<PointHSV>::ConstPtr(new pcl::FieldComparison<PointHSV>("h", pcl::ComparisonOps::GT, lowH)));
         range_cond->addComparison(pcl::FieldComparison<PointHSV>::ConstPtr(new pcl::FieldComparison<PointHSV>("h", pcl::ComparisonOps::LT, highH)));
     
-        pcl::ConditionalRemoval<pcl::PointXYZHSV> condrem;
+        pcl::ConditionalRemoval<PointHSV> condrem;
         condrem.setCondition(range_cond);
         condrem.setInputCloud(hsvCloudConst);
         condrem.setKeepOrganized(true);
         condrem.filter(*cloud_filtered);
 
-        const pcl::PointCloud<pcl::PointXYZ>::ConstPtr CloudFilteredConst(cloud_filtered);
+        const pcl::PointCloud<PointHSV>::ConstPtr CloudFilteredConst(cloud_filtered);
     
         // create a vector for storing the indices of the clusters
         std::vector<pcl::PointIndices> cluster_indices;
 
         // setup extraction:
-        pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
-        pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
+        pcl::search::KdTree<PointHSV>::Ptr tree (new pcl::search::KdTree<PointHSV>);
+        pcl::EuclideanClusterExtraction<PointHSV> ec;
         ec.setClusterTolerance(1); // cm
         ec.setMinClusterSize(3);
         ec.setMaxClusterSize(5000);
@@ -102,7 +102,7 @@ public:
             
         // We will fill this cloud with centroids
         pcl::PointCloud<pcl::PointXYZ> centroids;
-	    pcl::PointCloud<pcl::PointXYZ> curr_cluster;
+	    pcl::PointCloud<PointHSV> curr_cluster;
 	
 	    // Each index represents one cluster
 	    // Iterate through indexes
