@@ -1,0 +1,18 @@
+
+<library path="lib/libplanar_cluster">
+  <class name="cone_finder/PlanarCluster"
+         type="PlanarCluster::PlanarCluster"
+         base_class_type="nodelet::Nodelet">
+    <description>
+        This nodelet finds clusters in a pointcloud using a RANSAC ground plane filtering algorithm
+    </description>
+  </class>
+
+  <class name="cone_finder/ColorCluster"
+         type="ColorCluster::ColorCluster"
+         base_class_type="nodelet::Nodelet">
+    <description>
+        This nodelet finds clusters in a pointcloud using a color filtering algorithm
+    </description>
+  </class>
+</library>

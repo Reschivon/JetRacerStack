@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+
+<launch>
+    <arg name="svo_file"             default="" /> <!-- <arg name="svo_file" default="path/to/svo/file.svo"> -->
+    <arg name="stream"               default="" /> <!-- <arg name="stream" default="<ip_address>:<port>"> -->
+
+    <arg name="node_name"            default="zed_node" />
+    <arg name="camera_model"         default="zed2" />
+
+    <arg name="camera_name"          default="zed2" />
+
+    <arg name="base_frame"           default="base_link" />
+
+    <arg name="cam_pos_x"             default="0.0" /> <!-- Position respect to base frame (i.e. "base_link) -->
+    <arg name="cam_pos_y"             default="0.0" /> <!-- Position respect to base frame (i.e. "base_link) -->
+    <arg name="cam_pos_z"             default="0.0" /> <!-- Position respect to base frame (i.e. "base_link) -->
+    <arg name="cam_roll"              default="0.0" /> <!-- Orientation respect to base frame (i.e. "base_link) -->
+    <arg name="cam_pitch"             default="0.0" /> <!-- Orientation respect to base frame (i.e. "base_link) -->
+    <arg name="cam_yaw"               default="0.0" /> <!-- Orientation respect to base frame (i.e. "base_link) -->
+
+
+    <include file="$(find zed_wrapper)/launch/include/zed_camera.launch.xml">
+        <arg name="camera_name"         value="$(arg camera_name)" />
+        <arg name="svo_file"            value="$(arg svo_file)" />
+        <arg name="stream"              value="$(arg stream)" />
+        <arg name="node_name"           value="$(arg node_name)" />
+        <arg name="camera_model"        value="$(arg camera_model)" />
+        <arg name="base_frame"          value="$(arg base_frame)" />
+    </include>
+
+    <!-- Launch rivz display -->
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find perception)/zed_rviz.rviz" output="screen" />
+
+
+    <!-- Pointcloud Filtering for Cones -->
+    <group ns="cone_filtering">
+        <!-- this thing tends to use intermediate topics so best to put it in a namespace -->
+        <include file="$(find perception)/planar_cone_finder.launch">
+            <arg name="pointcloud_topic" value="/zed_node/point_cloud/cloud_registered" />
+            <arg name="conecloud_topic" value="/cone_cloud" />
+        </include>
+    </group>
+</launch>
