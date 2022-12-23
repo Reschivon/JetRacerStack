@@ -33,11 +33,11 @@
 
 
     <!-- Pointcloud Filtering for Cones -->
-    <group ns="cone_filtering">
+    <!--  <group ns="cone_filtering"> -->
         <!-- this thing tends to use intermediate topics so best to put it in a namespace -->
-        <include file="$(find perception)/planar_cone_finder.launch">
+        <include file="$(find perception)/color_cone_finder.launch">
             <arg name="pointcloud_topic" value="/zed_node/point_cloud/cloud_registered" />
             <arg name="conecloud_topic" value="/cone_cloud" />
         </include>
-    </group>
+    <!-- </group> -->
 </launch>

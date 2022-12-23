@@ -47,7 +47,7 @@ public:
         cloud_pub = n_.advertise<sensor_msgs::PointCloud2>("output", 1);
 
         n_.param("lowH", lowH, 10);
-        n_.param("highH", highH, 60);
+        n_.param("highH", highH, 75);
     }
 
     // this function gets called every time new pcl data comes in
@@ -58,6 +58,10 @@ public:
 	          "topic %s received.",
 	          getName().c_str(), input->width * input->height,
 	          input->header.frame_id.c_str(), n_.resolveName("input").c_str()); */
+            
+        NODELET_INFO(
+	          "[%s::cloudcd] Low: %d, high: %d",
+	          getName().c_str(), lowH, highH);
 	      
         // Convert PointCloud2 and store in reference of boost_ptr<pcl pointcloud>
         CloudPtr cloudRGB(new pcl::PointCloud<Point>);
@@ -67,12 +71,16 @@ public:
         CloudHSVPtr hsvCloud(new pcl::PointCloud<PointHSV>);
         pcl::PointCloudXYZRGBtoXYZHSV(cloudRGBConst, *hsvCloud);
         const pcl::PointCloud<PointHSV>::ConstPtr hsvCloudConst(hsvCloud);
-        
+
         CloudHSVPtr cloud_filtered(new pcl::PointCloud<PointHSV>);
-        
-        pcl::ConditionAnd<PointHSV>::Ptr range_cond(new pcl::ConditionAnd<PointHSV>());
-        range_cond->addComparison(pcl::FieldComparison<PointHSV>::ConstPtr(new pcl::FieldComparison<PointHSV>("h", pcl::ComparisonOps::GT, lowH)));
-        range_cond->addComparison(pcl::FieldComparison<PointHSV>::ConstPtr(new pcl::FieldComparison<PointHSV>("h", pcl::ComparisonOps::LT, highH)));
+
+        NODELET_INFO(
+	          "[%s::cloudcd] HSV Cloud size: %lu",
+	          getName().c_str(), hsvCloudConst->size());
+                
+        pcl::ConditionOr<PointHSV>::Ptr range_cond(new pcl::ConditionOr<PointHSV>());
+        range_cond->addComparison(pcl::FieldComparison<PointHSV>::ConstPtr(new pcl::FieldComparison<PointHSV>("h", pcl::ComparisonOps::LT, lowH)));
+        range_cond->addComparison(pcl::FieldComparison<PointHSV>::ConstPtr(new pcl::FieldComparison<PointHSV>("h", pcl::ComparisonOps::GT, highH)));
     
         pcl::ConditionalRemoval<PointHSV> condrem;
         condrem.setCondition(range_cond);
@@ -81,6 +89,10 @@ public:
         condrem.filter(*cloud_filtered);
 
         const pcl::PointCloud<PointHSV>::ConstPtr CloudFilteredConst(cloud_filtered);
+
+        NODELET_INFO(
+	          "[%s::cloudcd] Cloud filtered size: %lu",
+	          getName().c_str(), CloudFilteredConst->size());
     
         // create a vector for storing the indices of the clusters
         std::vector<pcl::PointIndices> cluster_indices;
@@ -98,7 +110,7 @@ public:
 
 
         int number_clusters = (int) cluster_indices.size();
-        NODELET_DEBUG("Number of clusters found: %d", number_clusters);
+        NODELET_INFO("Number of clusters found: %d", number_clusters);
             
         // We will fill this cloud with centroids
         pcl::PointCloud<pcl::PointXYZ> centroids;

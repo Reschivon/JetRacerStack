@@ -1,18 +1,20 @@
 
 <library path="lib/libplanar_cluster">
-  <class name="cone_finder/PlanarCluster"
+  <class name="perception/PlanarCluster"
          type="PlanarCluster::PlanarCluster"
          base_class_type="nodelet::Nodelet">
     <description>
         This nodelet finds clusters in a pointcloud using a RANSAC ground plane filtering algorithm
     </description>
   </class>
+</library>
 
-  <class name="cone_finder/ColorCluster"
+<library path="lib/libcolor_cluster">
+  <class name="perception/ColorCluster"
          type="ColorCluster::ColorCluster"
          base_class_type="nodelet::Nodelet">
     <description>
-        This nodelet finds clusters in a pointcloud using a color filtering algorithm
+        This nodelet finds clusters in a pointcloud using HSV color filtering algorithm
     </description>
   </class>
 </library>
