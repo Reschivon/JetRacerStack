@@ -29,6 +29,9 @@ private:
     ros::Publisher cloud_pub;
     unsigned int seq = 0;
 
+    double tolerance;
+    int minSize, maxSize;
+
 public:
     virtual void onInit() 
     {
@@ -37,6 +40,10 @@ public:
         n_ = getPrivateNodeHandle();
         cloud_sub = n_.subscribe("input", 10, &PlanarCluster::cloudcb, this);
         cloud_pub = n_.advertise<sensor_msgs::PointCloud2>("output", 1);
+
+        n_.param("tolerance", tolerance, 0.1);
+        n_.param("minSize", minSize, 3);
+        n_.param("maxSize", maxSize, 100);
     }
 
     // this function gets called every time new pcl data comes in
@@ -57,9 +64,9 @@ public:
         // setup extraction:
         pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
         pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
-        ec.setClusterTolerance(1); // cm
-        ec.setMinClusterSize(3);
-        ec.setMaxClusterSize(5000);
+        ec.setClusterTolerance(tolerance);
+        ec.setMinClusterSize(minSize);
+        ec.setMaxClusterSize(maxSize);
         ec.setSearchMethod(tree);
         ec.setInputCloud(cloud);
         // perform cluster extraction

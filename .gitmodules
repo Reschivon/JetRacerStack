@@ -1,0 +1,3 @@
+[submodule "src/depth-to-pointcloud"]
+	path = src/depth-to-pointcloud
+	url = https://github.com/Autonomous-Motorsports-Purdue/depth-to-pointcloud.git

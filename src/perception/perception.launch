@@ -4,6 +4,8 @@
     <arg name="svo_file"             default="" /> <!-- <arg name="svo_file" default="path/to/svo/file.svo"> -->
     <arg name="stream"               default="" /> <!-- <arg name="stream" default="<ip_address>:<port>"> -->
 
+    <arg name="publish_urdf"         default="true" />
+
     <arg name="node_name"            default="zed_node" />
     <arg name="camera_model"         default="zed2" />
 
@@ -18,26 +20,91 @@
     <arg name="cam_pitch"             default="0.0" /> <!-- Orientation respect to base frame (i.e. "base_link) -->
     <arg name="cam_yaw"               default="0.0" /> <!-- Orientation respect to base frame (i.e. "base_link) -->
 
+    <!-- ROS URDF description of the ZED -->
+    <group if="$(arg publish_urdf)">
+        <param name="$(arg camera_name)_description"
+               command="$(find xacro)/xacro '$(find zed_wrapper)/urdf/zed_descr.urdf.xacro'
+                        camera_name:=$(arg camera_name)
+                        camera_model:=$(arg camera_model)
+                        base_frame:=$(arg base_frame)
+                        cam_pos_x:=$(arg cam_pos_x)
+                        cam_pos_y:=$(arg cam_pos_y)
+                        cam_pos_z:=$(arg cam_pos_z)
+                        cam_roll:=$(arg cam_roll)
+                        cam_pitch:=$(arg cam_pitch)
+                        cam_yaw:=$(arg cam_yaw)"
+        />
 
-    <include file="$(find zed_wrapper)/launch/include/zed_camera.launch.xml">
-        <arg name="camera_name"         value="$(arg camera_name)" />
-        <arg name="svo_file"            value="$(arg svo_file)" />
-        <arg name="stream"              value="$(arg stream)" />
-        <arg name="node_name"           value="$(arg node_name)" />
-        <arg name="camera_model"        value="$(arg camera_model)" />
-        <arg name="base_frame"          value="$(arg base_frame)" />
-    </include>
+        <node name="$(arg camera_name)_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" output="screen" required="true">
+            <remap from="robot_description" to="$(arg camera_name)_description" />
+        </node>
+    </group>
+
+
+    <!-- Nodelet Manager -->
+    <node pkg="nodelet" type="nodelet" name="nodelet_manager" args="manager" output="screen" />
+
+    <node pkg="nodelet" type="nodelet" name="$(arg node_name)" args="load zed_nodelets/ZEDWrapperNodelet nodelet_manager" output="screen">
+        <rosparam file="$(find zed_wrapper)/params/common.yaml" command="load" />
+        <rosparam file="$(find zed_wrapper)/params/zed2.yaml" command="load" />
+
+        <!-- Camera name -->
+        <param name="general/camera_name"               value="$(arg camera_name)" />
+
+        <!-- Base frame -->
+        <param name="general/base_frame"                value="$(arg base_frame)" />
+
+        <!-- SVO file path -->
+        <param name="svo_file"                          value="$(arg svo_file)" />
+
+        <!-- Remote stream -->
+        <param name="stream"                            value="$(arg stream)" />
+
+        <!-- Camera ID -->
+        <param name="general/zed_id"                    value="0" />
+
+        <!-- GPU ID -->
+        <param name="general/gpu_id"                    value="0" />
+
+        <param name="sensors/sensors_timestamp_sync"    value="true" />
+        <param name="pos_tracking/area_memory"          value="true" />
+
+        <!-- Note: when the FPS is higher than the device can handle, the internal ZED
+             software will erroneously introduce a noticeable skew in the color data.
+             Incredibly annoying  -->
+        <param name="grab_frame_rate"                   value="2" />
+
+        <!-- Ok we're gonna use depth_image_proc to get the pointcloud ourselves
+             So this is not neccessary anymore but we can't turn it off either-->
+        <param name="point_cloud_freq"                  value="0.1" />
+        <param name="pub_frame_rate"                    value="2" />
+        
+        <param name="depth/sensing_mode"                value="1" /> <!-- fill -->
+        
+    </node> 
+
+    <!-- Convert depth image to pointcloud -->
+    <node name="depth_to_pc" pkg="nodelet" type="nodelet" args="load depth_image_proc/point_cloud_xyzrgb nodelet_manager" output="screen">
+        <remap from="rgb/camera_info" to="$(arg node_name)/rgb/camera_info" />
+        <remap from="rgb/image_rect_color" to="$(arg node_name)/rgb/image_rect_color" />
+        <remap from="depth_registered/image_rect" to="$(arg node_name)/depth/depth_registered" />
+
+        <remap from="depth_registered/points" to="$(arg node_name)/imitation_pointcloud" />
+
+        <!-- Holy shit this took so long. point_cloud_xyzrgb uses an ApproximateTime policy which syncs messages over arbitrary timestamps
+             But this POS was stalling after <queue_size> messages. So I forked the github repo, modified it to use TimeSynchronizer
+             (as all zed timestamps with the same hz are published together) and finally it works -->
+        <param name="queue_size" value="10" />
+    </node>
 
     <!-- Launch rivz display -->
     <node name="rviz" pkg="rviz" type="rviz" args="-d $(find perception)/zed_rviz.rviz" output="screen" />
 
-
     <!-- Pointcloud Filtering for Cones -->
-    <!--  <group ns="cone_filtering"> -->
-        <!-- this thing tends to use intermediate topics so best to put it in a namespace -->
-        <include file="$(find perception)/color_cone_finder.launch">
-            <arg name="pointcloud_topic" value="/zed_node/point_cloud/cloud_registered" />
-            <arg name="conecloud_topic" value="/cone_cloud" />
-        </include>
-    <!-- </group> -->
+    <!-- this thing tends to use intermediate topics so best to put it in a namespace -->
+    <include file="$(find perception)/color_cone_finder.launch">
+        <arg name="pointcloud_topic" value="/zed_node/imitation_pointcloud" />
+        <arg name="conecloud_topic" value="/cone_cloud" />
+    </include> 
+
 </launch>

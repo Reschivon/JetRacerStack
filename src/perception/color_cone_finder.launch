@@ -1,34 +1,57 @@
 <!-- This algorithm takes a pointcloud2 from zed and outputs a cloud of cone centroids -->
-    <launch>
-    <arg name="pointcloud_topic" default="/zed_node/point_cloud/cloud_registered" />
+<launch>
+    <arg name="pointcloud_topic" default="/zed_node/imitation_pointcloud" />
     <arg name="conecloud_topic" default="/cone_cloud" />
 
-    <node pkg="nodelet" type="nodelet" name="pcl_manager" args="manager" output="screen" />
+    <!-- VoxelGrid uses ints for indexing, so may lose precision when (side_length / voxel_size) is too big~ -->
+    <node pkg="nodelet" type="nodelet" name="cropbox" args="load pcl/CropBox nodelet_manager" output="screen">
+        <remap from="~input" to="$(arg pointcloud_topic)" />
+        <rosparam>
+            min_x: -5
+            max_x: 5
+            min_y: -5
+            max_y: 5
+            min_z: -5
+            max_z: 5
+        </rosparam>
+    </node>
 
     <!-- Run a VoxelGrid filter to clean NaNs and downsample the data -->
-    <node pkg="nodelet" type="nodelet" name="voxel_grid" args="load pcl/VoxelGrid pcl_manager" output="screen">
-        <remap from="~input" to="$(arg pointcloud_topic)" />
+    <node pkg="nodelet" type="nodelet" name="voxel_grid" args="load pcl/VoxelGrid nodelet_manager" output="screen">
+        <remap from="~input" to="cropbox/output" />
         <!-- outputs to voxel_grid/outputs -->
         <rosparam>
             filter_field_name: z
-            filter_limit_min: -100
-            filter_limit_max: 100
+            filter_limit_min: -20.0
+            filter_limit_max: 20.0
             filter_limit_negative: False
             leaf_size: 0.01
         </rosparam>
     </node>
 
-    <node pkg="nodelet" type="nodelet" name="clustering" args="load perception/ColorCluster pcl_manager" output="screen">
+    <node pkg="nodelet" type="nodelet" name="filter" args="load perception/ColorCluster nodelet_manager" output="screen">
         <remap from="~input" to="voxel_grid/output" />
+        <remap from="~output" to="filter/output" />
+
+        <rosparam>
+            lowH: 180
+            highH: 250
+            lowS: 15
+            highS: 255
+            lowV: 30
+            highV: 180
+        </rosparam>
+    </node>
+
+    <!-- Custom Euclidean Cluster Extractor (I couldn't make heads or tails of the pcl nodelet )-->
+    <node pkg="nodelet" type="nodelet" name="clustering" args="load perception/PlanarCluster nodelet_manager" output="screen">
+        <remap from="~input" to="filter/output" />
         <remap from="~output" to="$(arg conecloud_topic)" />
 
         <rosparam>
-            lowH: 10
-            highH: 60
-            lowS: 30
-            highS: 255
-            lowV: 60
-            highV: 180
+            tolerance: 0.05
+            minSize: 1
+            maxSize: 90
         </rosparam>
     </node>
 </launch>

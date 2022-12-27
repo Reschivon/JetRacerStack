@@ -6,15 +6,15 @@
     <node pkg="nodelet" type="nodelet" name="pcl_manager" args="manager" output="screen" />
 
     <node pkg="nodelet" type="nodelet" name="cropbox" args="load pcl/CropBox /pcl_manager" output="screen">
-    <remap from="~input" to="$(arg pointcloud_topic)" />
-    <rosparam>
-        min_x: -30
-        max_x: 30
-        min_y: -30
-        max_y: 30
-        min_z: -5
-        max_z: 5
-    </rosparam>
+        <remap from="~input" to="$(arg pointcloud_topic)" />
+        <rosparam>
+            min_x: -30
+            max_x: 30
+            min_y: -30
+            max_y: 30
+            min_z: -5
+            max_z: 5
+        </rosparam>
     </node>
 
     <!-- Run a VoxelGrid filter to clean NaNs and downsample the data -->
@@ -32,7 +32,7 @@
 
     <!-- Segment the table plane -->
     <node pkg="nodelet" type="nodelet" name="planar_segmentation" args="load pcl/SACSegmentation pcl_manager" output="screen">
-        <remap from="~input"   to="/voxel_grid/output" />
+        <remap from="~input"   to="voxel_grid/output" />
         <!-- outputs to planar_segmentation/inliers -->
         <rosparam>
             # -[ Mandatory parameters
@@ -66,9 +66,9 @@
     </node>
 
     <node pkg="nodelet" type="nodelet" name="extract_cone_indices" args="load pcl/ExtractIndices pcl_manager" output="screen">
-        <remap from="~input"   to="/voxel_grid/output" />
-        <remap from="~indices" to="/planar_segmentation/inliers" />
-        <!-- out to /extract_cone_indices/output -->
+        <remap from="~input"   to="voxel_grid/output" />
+        <remap from="~indices" to="planar_segmentation/inliers" />
+        <!-- out to extract_cone_indices/output -->
         <rosparam>
             negative: true
             <!-- Timestamps from ~input and ~indices may not match exactly
@@ -78,8 +78,14 @@
     </node>
 
     <!-- Custom Euclidean Cluster Extractor (I couldn't make heads or tails of the pcl nodelet )-->
-    <node pkg="nodelet" type="nodelet" name="clustering" args="load cone_finder/PlanarCluster pcl_manager" output="screen">
-        <remap from="~input" to="/extract_cone_indices/output" />
+    <node pkg="nodelet" type="nodelet" name="clustering" args="load perception/PlanarCluster pcl_manager" output="screen">
+        <remap from="~input" to="extract_cone_indices/output" />
         <remap from="~output" to="$(arg conecloud_topic)" />
+
+        <rosparam>
+            tolerance: 0.05
+            minSize: 3
+            maxSize: 20
+        </rosparam>
     </node>
 </launch>
