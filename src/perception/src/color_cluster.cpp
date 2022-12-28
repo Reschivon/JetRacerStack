@@ -122,25 +122,25 @@ public:
     // this function gets called every time new pcl data comes in
     void cloudcb(const sensor_msgs::PointCloud2::ConstPtr &input)
     {
-     	/* NODELET_INFO(
+     	  /* NODELET_INFO(
 	          "[%s::input_indices_callback] PointCloud with %d data points and frame %s on "
 	          "topic %s received.",
 	          getName().c_str(), input->width * input->height,
 	          input->header.frame_id.c_str(), n_.resolveName("input").c_str()); */
             
-        NODELET_INFO(
+        /* NODELET_INFO(
 	          "[%s::cloudcd] Low: %d, high: %d",
-	          getName().c_str(), lowH, highH);
+	          getName().c_str(), lowH, highH); */
 
  
 	      
         // Convert PointCloud2 and store in reference of boost_ptr<pcl pointcloud>
         CloudPtr cloudRGB(new pcl::PointCloud<Point>);
-	    pcl::fromROSMsg(*input, *cloudRGB);
+	      pcl::fromROSMsg(*input, *cloudRGB);
 
-        NODELET_INFO(
+        /* NODELET_INFO(
 	          "[%s::cloudcd] Initial size: %lu",
-	          getName().c_str(), cloudRGB->size());
+	          getName().c_str(), cloudRGB->size()); */
         
         pcl::PointCloud<pcl::PointXYZRGB>::Ptr filtered (new pcl::PointCloud<pcl::PointXYZRGB>);
 
@@ -151,9 +151,9 @@ public:
         removal_filter.setInputCloud (cloudRGB);
         removal_filter.filter (*filtered);
         
-        NODELET_INFO(
+        /* NODELET_INFO(
 	          "[%s::cloudcd] Cloud filtered size: %lu",
-	          getName().c_str(), filtered->size());
+	          getName().c_str(), filtered->size()); */
         
         sensor_msgs::PointCloud2 publish_cloud;
         pcl::toROSMsg(*filtered, publish_cloud);

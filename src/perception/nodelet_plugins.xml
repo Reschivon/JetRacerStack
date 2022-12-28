@@ -18,3 +18,14 @@
     </description>
   </class>
 </library>
+
+
+<library path="lib/liblandmark_graph">
+  <class name="perception/LandmarkGraph"
+         type="LandmarkGraph::LandmarkGraph"
+         base_class_type="nodelet::Nodelet">
+    <description>
+        This nodelet stores -Pointcloud- points as transforms of poses in -Path-
+    </description>
+  </class>
+</library>

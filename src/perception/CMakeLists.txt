@@ -30,8 +30,13 @@ add_library(planar_cluster src/planar_cluster.cpp)
 add_dependencies(planar_cluster ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(planar_cluster ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
+# Create new target for landmark_graph
+add_library(landmark_graph src/landmark_graph.cpp)
+add_dependencies(landmark_graph ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(landmark_graph ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+
 install(TARGETS
-  planar_cluster color_cluster
+  planar_cluster color_cluster landmark_graph
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
