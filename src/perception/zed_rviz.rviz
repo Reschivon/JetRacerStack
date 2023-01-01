@@ -3,9 +3,11 @@ Panels:
     Help Height: 0
     Name: Displays
     Property Tree Widget:
-      Expanded: ~
-      Splitter Ratio: 0.494577020406723
-    Tree Height: 299
+      Expanded:
+        - /TF1/Frames1
+        - /Final Cone Centers1
+      Splitter Ratio: 0.79076087474823
+    Tree Height: 296
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -21,10 +23,9 @@ Panels:
     Name: Views
     Splitter Ratio: 0.5
   - Class: rviz/Time
-    Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: Image
+    SyncSource: Final Cone Centers
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -55,27 +56,60 @@ Visualization Manager:
       Frame Timeout: 5
       Frames:
         All Enabled: false
+        base_link:
+          Value: true
+        map:
+          Value: true
+        odom:
+          Value: true
+        zed2_baro_link:
+          Value: false
+        zed2_base_link:
+          Value: false
+        zed2_camera_center:
+          Value: false
+        zed2_left_camera_frame:
+          Value: false
+        zed2_left_camera_optical_frame:
+          Value: true
+        zed2_mag_link:
+          Value: false
+        zed2_right_camera_frame:
+          Value: false
+        zed2_right_camera_optical_frame:
+          Value: false
+        zed2_temp_left_link:
+          Value: false
+        zed2_temp_right_link:
+          Value: false
+      Marker Alpha: 1
       Marker Scale: 0.5
       Name: TF
       Show Arrows: true
       Show Axes: true
       Show Names: true
       Tree:
-        {}
+        map:
+          odom:
+            base_link:
+              zed2_base_link:
+                zed2_camera_center:
+                  zed2_baro_link:
+                    {}
+                  zed2_left_camera_frame:
+                    zed2_left_camera_optical_frame:
+                      {}
+                    zed2_temp_left_link:
+                      {}
+                  zed2_mag_link:
+                    {}
+                  zed2_right_camera_frame:
+                    zed2_right_camera_optical_frame:
+                      {}
+                    zed2_temp_right_link:
+                      {}
       Update Interval: 0
       Value: true
-    - Class: rviz/Image
-      Enabled: false
-      Image Topic: /zed_node/stereo/image_rect_color
-      Max Value: 1
-      Median window: 5
-      Min Value: 0
-      Name: Stereo
-      Normalize Range: true
-      Queue Size: 2
-      Transport Hint: raw
-      Unreliable: false
-      Value: false
     - Alpha: 1
       Buffer Length: 1
       Class: rviz/Path
@@ -93,10 +127,35 @@ Visualization Manager:
         Z: 0
       Pose Color: 255; 85; 255
       Pose Style: None
+      Queue Size: 10
       Radius: 0.029999999329447746
       Shaft Diameter: 0.10000000149011612
       Shaft Length: 0.10000000149011612
       Topic: /zed_node/path_odom
+      Unreliable: false
+      Value: true
+    - Class: rviz/Image
+      Enabled: true
+      Image Topic: /zed_node/rgb/image_rect_color
+      Max Value: 1
+      Median window: 5
+      Min Value: 0
+      Name: Left RGB
+      Normalize Range: true
+      Queue Size: 2
+      Transport Hint: raw
+      Unreliable: false
+      Value: true
+    - Class: rviz/Image
+      Enabled: true
+      Image Topic: /zed_node/depth/depth_registered
+      Max Value: 1
+      Median window: 5
+      Min Value: 0
+      Name: Depth
+      Normalize Range: true
+      Queue Size: 2
+      Transport Hint: raw
       Unreliable: false
       Value: true
     - Alpha: 1
@@ -223,47 +282,79 @@ Visualization Manager:
       Color: 255; 255; 255
       Color Transformer: Intensity
       Decay Time: 0
-      Enabled: true
+      Enabled: false
       Invert Rainbow: false
       Max Color: 200; 200; 200
       Max Intensity: 4096
       Min Color: 200; 200; 200
       Min Intensity: 0
-      Name: Cone Centers
+      Name: Local Cone Centers
       Position Transformer: XYZ
       Queue Size: 10
       Selectable: true
       Size (Pixels): 12
       Size (m): 0.05000000074505806
       Style: Points
-      Topic: /cone_cloud
+      Topic: /local_cone_cloud
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: false
-      Value: true
-    - Class: rviz/Image
-      Enabled: true
-      Image Topic: /zed_node/depth/depth_registered
-      Max Value: 1
-      Median window: 5
-      Min Value: 0
-      Name: Depth
-      Normalize Range: true
-      Queue Size: 2
-      Transport Hint: raw
+      Value: false
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz/PointCloud2
+      Color: 255; 255; 255
+      Color Transformer: Intensity
+      Decay Time: 0
+      Enabled: false
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Min Color: 0; 0; 0
+      Name: Cumulatve Cone Centers
+      Position Transformer: XYZ
+      Queue Size: 10
+      Selectable: true
+      Size (Pixels): 5
+      Size (m): 12
+      Style: Points
+      Topic: /cum_corrected_cloud
       Unreliable: false
-      Value: true
-    - Class: rviz/Image
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: false
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz/PointCloud2
+      Color: 255; 255; 255
+      Color Transformer: Intensity
+      Decay Time: 0
       Enabled: true
-      Image Topic: /zed_node/rgb/image_rect_color
-      Max Value: 1
-      Median window: 5
-      Min Value: 0
-      Name: Left RGB
-      Normalize Range: true
-      Queue Size: 2
-      Transport Hint: raw
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Min Color: 0; 0; 0
+      Name: Final Cone Centers
+      Position Transformer: XYZ
+      Queue Size: 10
+      Selectable: true
+      Size (Pixels): 8
+      Size (m): 0.10000000149011612
+      Style: Spheres
+      Topic: /corrected_cones
       Unreliable: false
+      Use Fixed Frame: true
+      Use rainbow: true
       Value: true
   Enabled: true
   Global Options:
@@ -293,40 +384,38 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 1.600530743598938
+      Distance: 3.8941190242767334
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
+      Field of View: 0.7853981852531433
       Focal Point:
-        X: 1.4098329544067383
-        Y: -0.4618585407733917
-        Z: 0.786044716835022
+        X: 0.8288270831108093
+        Y: 0.6123203039169312
+        Z: 1.6957886219024658
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.15979643166065216
+      Pitch: -0.9352037906646729
       Target Frame: base_link
-      Value: Orbit (rviz)
-      Yaw: 3.153609275817871
+      Yaw: 3.3586108684539795
     Saved: ~
 Window Geometry:
   Depth:
     collapsed: false
   Displays:
     collapsed: false
-  Height: 920
+  Height: 927
   Hide Left Dock: false
   Hide Right Dock: true
   Left RGB:
     collapsed: false
-  QMainWindow State: 000000ff00000000fd00000004000000000000017200000354fc0200000016fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000002700000168000000c900fffffffb0000001600430061006d0065007200610020007600690065007701000001cd000001270000000000000000fb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000000a004400650070007400680100000195000000ee0000001600fffffffb0000000a0049006d006100670065000000028b000000c40000000000000000fb0000000a0049006d006100670065010000028a000000c50000000000000000fb0000000a0049006d00610067006500000002b30000009c0000000000000000fb0000000a0049006d006100670065010000028b000000c40000000000000000fb00000012004400650070007400680020006d0061007002000002420000019300000280000001e0fb0000001c0043006f006e0066006900640065006e006300650020006d0061007002000005000000019300000280000001e0fb0000001c0043006f006e0066006900640065006e006300650020006d00610070020000058200000195000001ea0000010dfb00000016004c006500660074002000630061006d00650072006102000002450000025800000280000001e0fb0000001800520069006700680074002000630061006d00650072006102000004300000025800000280000001e0fb0000000c00530074006500720065006f000000021b000000940000001600fffffffb0000000a0049006d006100670065010000029a000000e10000000000000000fb00000010004c00650066007400200052004700420100000289000000f20000001600ffffff000000010000010f000003c6fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003b000003c6000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e100000197000000030000073f00000040fc0100000002fb0000000800540069006d006500000000000000073f000004f300fffffffb0000000800540069006d00650100000000000004500000000000000000000002900000035400000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd00000004000000000000019f00000349fc0200000016fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003b00000163000000c700fffffffb0000001600430061006d0065007200610020007600690065007701000001cd000001270000000000000000fb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000000a0044006500700074006801000001a4000000ea0000001600fffffffb0000000a0049006d006100670065000000028b000000c40000000000000000fb0000000a0049006d006100670065010000028a000000c50000000000000000fb0000000a0049006d00610067006500000002b30000009c0000000000000000fb0000000a0049006d006100670065010000028b000000c40000000000000000fb00000012004400650070007400680020006d0061007002000002420000019300000280000001e0fb0000001c0043006f006e0066006900640065006e006300650020006d0061007002000005000000019300000280000001e0fb0000001c0043006f006e0066006900640065006e006300650020006d00610070020000058200000195000001ea0000010dfb00000016004c006500660074002000630061006d00650072006102000002450000025800000280000001e0fb0000001800520069006700680074002000630061006d00650072006102000004300000025800000280000001e0fb0000000c00530074006500720065006f000000021b000000940000000000000000fb0000000a0049006d006100670065010000029a000000e10000000000000000fb00000010004c00650066007400200052004700420100000294000000f00000001600ffffff000000010000010f000003c6fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003b000003c6000000a000fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e100000197000000030000073f00000040fc0100000002fb0000000800540069006d006500000000000000073f0000035c00fffffffb0000000800540069006d006501000000000000045000000000000000000000040f0000034900000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
-    collapsed: false
-  Stereo:
     collapsed: false
   Time:
     collapsed: false
@@ -334,6 +423,6 @@ Window Geometry:
     collapsed: false
   Views:
     collapsed: true
-  Width: 1032
-  X: 629
-  Y: 29
+  Width: 1460
+  X: 963
+  Y: 173

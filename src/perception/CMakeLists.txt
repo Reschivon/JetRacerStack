@@ -36,7 +36,7 @@ add_dependencies(landmark_graph ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXP
 target_link_libraries(landmark_graph ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
 install(TARGETS
-  planar_cluster color_cluster landmark_graph
+  planar_cluster color_cluster
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

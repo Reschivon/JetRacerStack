@@ -19,7 +19,6 @@
   </class>
 </library>
 
-
 <library path="lib/liblandmark_graph">
   <class name="perception/LandmarkGraph"
          type="LandmarkGraph::LandmarkGraph"

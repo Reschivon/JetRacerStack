@@ -1,6 +1,13 @@
 <?xml version="1.0"?>
 
 <launch>
+
+    <!-- Launch rivz display -->
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find perception)/zed_rviz.rviz" output="screen" />
+
+    <!-- View debug messages -->
+    <!-- <node name="rqt_gui" pkg="rqt_console" type="rqt_console"/> -->
+
     <arg name="use_rosbag"           default="true" />
     <arg name="svo_file"             default="" /> <!-- <arg name="svo_file" default="path/to/svo/file.svo"> -->
     <arg name="stream"               default="" /> <!-- <arg name="stream" default="<ip_address>:<port>"> -->
@@ -84,7 +91,7 @@
     </group> 
 
     <group if="$(arg use_rosbag)">
-        <node name="play_rosbag" pkg="rosbag" type="play" output="screen" args="--clock $(find perception)/../bagfiles/velodyne_pc2.bag" />
+        <node name="play_rosbag" pkg="rosbag" type="play" output="log" args="--clock $(find perception)/../bagfiles/velodyne_pc4.bag" />
     </group>
 
     <!-- Convert depth image to pointcloud -->
@@ -101,19 +108,30 @@
         <param name="queue_size" value="10" />
     </node>
 
-    <!-- Launch rivz display -->
-    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find perception)/zed_rviz.rviz" output="screen" />
-
-    <!-- Pointcloud Filtering for Cones -->
+    <!-- Filter pointcloud for Cones -->
     <include file="$(find perception)/color_cone_finder.launch">
         <arg name="pointcloud_topic" value="/zed_node/imitation_pointcloud" />
-        <arg name="conecloud_topic" value="/cone_cloud" />
+        <arg name="conecloud_topic" value="local_cone_cloud" />
     </include> 
 
-    <!-- Graph Building -->
-    <node pkg="nodelet" type="nodelet" name="graph" args="load perception/LandmarkGraph nodelet_manager" output="screen">
+    <!-- Store Cone positions at incremental positions -->
+    <node pkg="nodelet" type="nodelet" name="landmark_accum" args="load perception/LandmarkGraph nodelet_manager" output="screen">
         <remap from="~path" to="/zed_node/path_map" />
-        <remap from="~cloud" to="/cone_cloud" />
+        <remap from="~cloud" to="local_cone_cloud" />
+        <remap from="~cum_path" to="cum_corrected_cloud" />
+
+        <param name="publish_frame" value="map" />
     </node> 
+
+    <node pkg="nodelet" type="nodelet" name="final_cones_cluster" args="load perception/PlanarCluster nodelet_manager" output="screen">
+        <remap from="~input" to="cum_corrected_cloud" />
+        <remap from="~output" to="corrected_cones" />
+
+        <rosparam>
+            tolerance: 0.06
+            minSize: 3
+            maxSize: 40
+        </rosparam>
+    </node>
 
 </launch>

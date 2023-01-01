@@ -2,3 +2,5 @@ build/
 devel/
 .vscode/
 bagfiles/
+JetRacerStack.code-workspace
+frames*
