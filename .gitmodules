@@ -1,3 +1,8 @@
 [submodule "src/depth-to-pointcloud"]
 	path = src/depth-to-pointcloud
 	url = https://github.com/Autonomous-Motorsports-Purdue/depth-to-pointcloud.git
+
+
+[submodule "src/zed-ros-wrapper"]
+	path = src/zed-ros-wrapper
+	url = https://github.com/stereolabs/zed-ros-wrapper
