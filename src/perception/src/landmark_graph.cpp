@@ -2,6 +2,7 @@
 #include <fstream>
 #include <memory>
 #include <stdint.h>
+#include <mutex>
 
 #include <ros/ros.h>
 #include <nodelet/nodelet.h>
