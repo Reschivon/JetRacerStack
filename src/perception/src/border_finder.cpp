@@ -19,6 +19,7 @@
 #include <tf2/LinearMath/Quaternion.h>
 
 #include <opencv2/imgproc.hpp>
+#include "opencv2/highgui.hpp"
 #include "delaunator.hpp"
 
 namespace BorderFinder {
@@ -32,7 +33,7 @@ private:
     ros::Publisher cloud_pub;
 
     double track_width, cone_spacing;
-    double deviation_ratio;
+    double deviation_ratio, resolution;
 
     using Point = pcl::PointXYZ;
     using Cloud = pcl::PointCloud<Point>;
@@ -44,11 +45,12 @@ public:
         
         n_ = getPrivateNodeHandle();
         cloud_sub = n_.subscribe("input", 10, &BorderFinder::cloudcb, this);
-        cloud_pub = n_.advertise<nav_msgs::OccupancyGrid>("output", 1);
+        cloud_pub = n_.advertise<nav_msgs::OccupancyGrid>("output", 1, true);
 
         n_.param("track_width", track_width, 0.2);
         n_.param("cone_spacing", cone_spacing, 0.15);
         n_.param("deviation_ratio", deviation_ratio, 0.2);
+        n_.param("resolution", resolution, 0.03);
     }
 
     void cloudcb(const sensor_msgs::PointCloud2::ConstPtr &input) {
@@ -64,7 +66,7 @@ public:
         std::vector<double> coords;
         coords.reserve(cloud.size() * 2);
 
-        int minX = 0, minY = 0, maxX = 0, maxY = 0;
+        double minX = 0, minY = 0, maxX = 0, maxY = 0;
         for(const Point& point : cloud) {
             // TODO this is hardcoded for a wall mounted track
             float x = point.z;
@@ -77,15 +79,18 @@ public:
 
             coords.emplace_back(x);
             coords.emplace_back(y);
-            std::cout << "PPPPP " << point.z << " " << point.y << " " << point.z << std::endl;
         }
 
-        int width = maxX - minX;
-        int height = maxY - minY;
-        double resolution = 0.1;
+        // minX -= 1;
+        // maxX += 1;
+        // minY -= 1;
+        // maxY += 1;
+
+        double width = maxX - minX;
+        double height = maxY - minY;
 
         // Dest occupancy map
-        cv::Mat occupancy(width / resolution, height / resolution, CV_8S, cv::Scalar(255));
+        cv::Mat occupancy(width / resolution, height / resolution, CV_8S, cv::Scalar(0));
 
         const auto meters_to_pixel = [&](double x, double y) -> std::pair<double, double>{
             return {(x - minX) / resolution,
@@ -115,7 +120,6 @@ public:
                     hypot(x2 - centroidX, y2 - centroidY) + 
                     hypot(x3 - centroidX, y3 - centroidY); 
 
-            
             auto point1pix = meters_to_pixel(x1, y1);
             auto point2pix = meters_to_pixel(x2, y2);
             auto point3pix = meters_to_pixel(x3, y3);
@@ -124,10 +128,13 @@ public:
                                 (cv::Point(point3pix.first, point3pix.second));
         
             if (abs(centroidDeviation / ideal_centroid_deviation - 1) < deviation_ratio) {
+                std::cout << 127 * (centroidDeviation / ideal_centroid_deviation) << std::endl;
                 // OK, this triangle works for us
-                cv::fillConvexPoly(occupancy, points, cv::Scalar(255));
+                cv::fillConvexPoly(occupancy, points, cv::Scalar(50 * (centroidDeviation / ideal_centroid_deviation)));
             }
         }
+
+        cv::imwrite("immmmm.png", occupancy);
 
         // Copy the cv matrix to occupancy grid
         nav_msgs::OccupancyGridPtr map = nav_msgs::OccupancyGridPtr(new nav_msgs::OccupancyGrid());
@@ -140,7 +147,7 @@ public:
         map->info.origin.position.y = minY;
         map->info.origin.position.z = 0.0;
         tf2::Quaternion q;
-        q.setEuler(0, 0, 0);
+        q.setEuler(-1.51, 0, 0);
         map->info.origin.orientation.x = q.getX();
         map->info.origin.orientation.y = q.getY();
         map->info.origin.orientation.z = q.getZ();
@@ -150,6 +157,9 @@ public:
         map->data.reserve(occupancy.total());
         map->data.insert(map->data.begin(), occupancy.data, occupancy.data + occupancy.total());
 
+        map->header.frame_id = "map";
+
+        std::cout << "PUBLISHEDD!!!!" << std::endl;
         cloud_pub.publish(map);
     }
 

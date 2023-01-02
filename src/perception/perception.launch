@@ -141,7 +141,8 @@
         <rosparam>
             track_width: 0.3048 <!-- 12 in -->
             cone_spacing: 0.254 <!-- 10 in -->
-            deviation_ratio: 0.2 <!-- allowed, so [80%, 120%]-->
+            deviation_ratio: 0.9 <!-- allowed, so [80%, 120%]-->
+            resolution: 0.01
         </rosparam>
     </node>
 
