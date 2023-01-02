@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.0.2)
 project(perception)
 
 find_package(catkin REQUIRED COMPONENTS
-	pcl_ros nodelet roscpp
+	pcl_ros nodelet roscpp cv_bridge
 )
 
 find_package(PCL 1.3 REQUIRED COMPONENTS common)
@@ -13,11 +13,11 @@ add_definitions(${PCL_DEFINITIONS})
 catkin_package(
    INCLUDE_DIRS src
    LIBRARIES 
-   CATKIN_DEPENDS nodelet roscpp
+   CATKIN_DEPENDS nodelet roscpp cv_bridge
 )
 
 include_directories(include
-  ${catkin_INCLUDE_DIRS}
+  ${catkin_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS}
 )
 
 # Create new target for color_cluster
@@ -35,8 +35,13 @@ add_library(landmark_graph src/landmark_graph.cpp)
 add_dependencies(landmark_graph ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(landmark_graph ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
+# Create new target for border_finder
+add_library(border_finder src/border_finder.cpp)
+add_dependencies(border_finder ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(border_finder ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+
 install(TARGETS
-  planar_cluster color_cluster
+  planar_cluster color_cluster landmark_graph border_finder
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

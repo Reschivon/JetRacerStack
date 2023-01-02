@@ -134,4 +134,15 @@
         </rosparam>
     </node>
 
+    <node pkg="nodelet" type="nodelet" name="borders" args="load perception/BorderFinder nodelet_manager" output="screen">
+        <remap from="~input" to="corrected_cones" />
+        <remap from="~output" to="drivable_map" />
+
+        <rosparam>
+            track_width: 0.3048 <!-- 12 in -->
+            cone_spacing: 0.254 <!-- 10 in -->
+            deviation_ratio: 0.2 <!-- allowed, so [80%, 120%]-->
+        </rosparam>
+    </node>
+
 </launch>

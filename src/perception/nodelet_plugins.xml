@@ -28,3 +28,14 @@
     </description>
   </class>
 </library>
+
+<library path="lib/libborder_finder">
+  <class name="perception/BorderFinder"
+         type="BorderFinder::BorderFinder"
+         base_class_type="nodelet::Nodelet">
+    <description>
+        This nodelet finds borders given a pointcloud of cone positions
+    </description>
+  </class>
+</library>
+
