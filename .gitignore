@@ -4,3 +4,5 @@ devel/
 bagfiles/
 JetRacerStack.code-workspace
 frames*
+install/
+log/

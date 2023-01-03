@@ -1,13 +1,8 @@
 #include <iostream>
 #include <fstream>
 #include <memory>
-#include <ros/ros.h>
-#include <nodelet/nodelet.h>
-#include <pluginlib/class_list_macros.h>
+#include <rclcpp/rclcpp.hpp>
 
-#include <Eigen/Dense>
-#include <tf/transform_broadcaster.h>
-#include <geometry_msgs/PointStamped.h>
 
 #include <pcl/PCLPointCloud2.h>
 #include <pcl/ModelCoefficients.h>
@@ -17,12 +12,10 @@
 #include <pcl/common/centroid.h>
 #include <pcl/point_types_conversion.h>
 #include <pcl/filters/conditional_removal.h>
-
-#include <sensor_msgs/PointCloud2.h>
 #include <pcl_conversions/pcl_conversions.h>
 
-namespace ColorCluster {
-
+#include <geometry_msgs/msg/point_stamped.hpp>
+#include <sensor_msgs/msg/point_cloud2.hpp>
 
 template <typename PointT>
 class ConditionThresholdHSV : public pcl::ConditionBase<PointT>
@@ -87,15 +80,12 @@ class ConditionThresholdHSV : public pcl::ConditionBase<PointT>
 };
 
 
-class ColorCluster : public nodelet::Nodelet
+class ColorCluster : public rclcpp::Node
 {
 
 private:
-    ros::NodeHandle n_;
-    ros::Subscriber cloud_sub;
-    ros::Publisher cloud_pub, cluster_pub;
-
-    int lowH, highH, lowS, highS, lowV, highV;
+    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr cloud_sub;
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr cloud_pub, cluster_pub;
 
     using Point = pcl::PointXYZRGB;
     using PointHSV = pcl::PointXYZHSV;
@@ -103,25 +93,36 @@ private:
     using CloudHSVPtr = pcl::PointCloud<PointHSV>::Ptr;
 
 public:
-    virtual void onInit() 
+    explicit ColorCluster(const rclcpp::NodeOptions& options)
+	: Node("ColorCluster", rclcpp::NodeOptions(options).use_intra_process_comms(true))
     {
-        NODELET_DEBUG("Creating subscribers and publishers");
+        RCLCPP_DEBUG(this->get_logger(), "Creating subscribers and publishers");
         
-        n_ = getPrivateNodeHandle();
-        cloud_sub = n_.subscribe("input", 10, &ColorCluster::cloudcb, this);
-        cloud_pub = n_.advertise<sensor_msgs::PointCloud2>("output", 1);
+        cloud_sub = create_subscription<sensor_msgs::msg::PointCloud2>("input", 10, 
+            std::bind(&ColorCluster::cloudcb, this, std::placeholders::_1));
+        cloud_pub = create_publisher<sensor_msgs::msg::PointCloud2>("output", 1);
 
-        n_.param("lowH", lowH, 10);
-        n_.param("highH", highH, 75);
-        n_.param("lowS", lowS, 10);
-        n_.param("highS", highS, 75);
-        n_.param("lowV", lowV, 10);
-        n_.param("highV", highV, 75);
+        declare_parameter("lowH", 10);
+        declare_parameter("highH", 75);
+        declare_parameter("lowS", 10);
+        declare_parameter("highS", 75);
+        declare_parameter("lowV", 10);
+        declare_parameter("highV", 75);
     }
 
     // this function gets called every time new pcl data comes in
-    void cloudcb(const sensor_msgs::PointCloud2::ConstPtr &input)
+    void cloudcb(const sensor_msgs::msg::PointCloud2::UniquePtr input)
     {
+
+        int lowH, highH, lowS, highS, lowV, highV;
+
+        lowH = get_parameter("lowH").as_int();
+        highH = get_parameter("g").as_int();
+        lowS = get_parameter("lowS").as_int();
+        highS = get_parameter("highS").as_int();
+        lowV = get_parameter("lowV").as_int();
+        highV = get_parameter("highV").as_int();
+
      	  /* NODELET_INFO(
 	          "[%s::input_indices_callback] PointCloud with %d data points and frame %s on "
 	          "topic %s received.",
@@ -155,16 +156,17 @@ public:
 	          "[%s::cloudcd] Cloud filtered size: %lu",
 	          getName().c_str(), filtered->size()); */
         
-        sensor_msgs::PointCloud2 publish_cloud;
-        pcl::toROSMsg(*filtered, publish_cloud);
+        sensor_msgs::msg::PointCloud2::UniquePtr publish_cloud(new sensor_msgs::msg::PointCloud2());
+        pcl::toROSMsg(*filtered, *publish_cloud);
         
-        publish_cloud.header.stamp = input->header.stamp;
-        publish_cloud.header.frame_id = input->header.frame_id;
+        publish_cloud->header.stamp = input->header.stamp;
+        publish_cloud->header.frame_id = input->header.frame_id;
 
-        cloud_pub.publish(boost::make_shared<sensor_msgs::PointCloud2>(publish_cloud));
+        cloud_pub->publish(std::move(publish_cloud));
     }
 };
 
-}
 
-PLUGINLIB_EXPORT_CLASS(ColorCluster::ColorCluster, nodelet::Nodelet);
+#include "rclcpp_components/register_node_macro.hpp"
+RCLCPP_COMPONENTS_REGISTER_NODE(ColorCluster)
+

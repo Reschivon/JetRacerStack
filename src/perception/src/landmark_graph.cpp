@@ -3,22 +3,27 @@
 #include <memory>
 #include <stdint.h>
 #include <mutex>
+#include <utility>
+	
+#include <rclcpp/rclcpp.hpp>
 
-#include <ros/ros.h>
-#include <nodelet/nodelet.h>
-#include <pluginlib/class_list_macros.h>
+#include <rclcpp/qos.hpp>
+// #include <rclcpp/clock.hpp>
+// #include <rclcpp/cock.hpp> heh heh hehehe
 
-#include <Eigen/Dense>
-#include <tf/transform_broadcaster.h>
-#include <geometry_msgs/PointStamped.h>
-#include <sensor_msgs/PointCloud2.h>
-#include <nav_msgs/Path.h>
-#include <pcl_conversions/pcl_conversions.h>
-#include <pcl_ros/transforms.h>
+#include <Eigen/Geometry> 
 
 #include <tf2_ros/transform_listener.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
-#include <tf/transform_datatypes.h>
+#include "tf2/exceptions.h"
+#include "tf2_ros/transform_listener.h"
+#include "tf2_ros/buffer.h"
+#include <tf2/convert.h>
+#include <tf2_eigen/tf2_eigen.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+
+#include <pcl_conversions/pcl_conversions.h>
+#include <pcl/common/transforms.h>
 
 #include <pcl/PCLPointCloud2.h>
 #include <pcl/point_types.h>
@@ -26,16 +31,30 @@
 #include <pcl/point_types_conversion.h>
 #include <pcl/filters/conditional_removal.h>
 
-namespace LandmarkGraph {
+#include <geometry_msgs/msg/point_stamped.hpp>
+#include <sensor_msgs/msg/point_cloud2.hpp>
+#include <nav_msgs/msg/path.hpp>
 
+static const rmw_qos_profile_t latched_map_data_profile =
+{
+  RMW_QOS_POLICY_HISTORY_KEEP_LAST,
+  5,
+  RMW_QOS_POLICY_RELIABILITY_RELIABLE,
+  RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL,
+  RMW_QOS_DEADLINE_DEFAULT,
+  RMW_QOS_LIFESPAN_DEFAULT,
+  RMW_QOS_POLICY_LIVELINESS_SYSTEM_DEFAULT,
+  RMW_QOS_LIVELINESS_LEASE_DURATION_DEFAULT,
+  false
+};
 
-class LandmarkGraph : public nodelet::Nodelet
+class LandmarkGraph : public rclcpp::Node
 {
 
 private:
-    ros::NodeHandle n_;
-    ros::Subscriber path_sub, cloud_sub;
-    ros::Publisher cum_path_pub;
+    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr cloud_sub;
+    rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr path_sub;
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr cum_path_pub;
 
     // This node has two modes
     // first accumulate landmark pointclouds and store them
@@ -44,50 +63,54 @@ private:
     bool accumulate_mode = true;
 
     // TF listener continuously writes to buffer in its own thread
-    tf2_ros::Buffer tfBuffer;
-    std::unique_ptr<tf2_ros::TransformListener> tfListener;
+    std::shared_ptr<tf2_ros::TransformListener> tfListener{nullptr};
+    std::unique_ptr<tf2_ros::Buffer> tfBuffer;
 
     // Maintain a queue of most recent 10 paths
-    std::deque<nav_msgs::Path::ConstPtr> paths;
+    std::deque<nav_msgs::msg::Path::ConstSharedPtr> paths;
     std::mutex paths_lock;
-    int paths_size = 10;
+    size_t paths_size = 10;
 
     // Snapshots are records of landmark poses relative to a central coordinate  
     using Point = pcl::PointXYZ;
     using Cloud = pcl::PointCloud<Point>;
-    // Store snapshots and their corresponding path_map poses (defined as their timestamp)
-    std::vector<std::tuple<ros::Time, geometry_msgs::Pose, Cloud>> snapshots;
 
-    geometry_msgs::Pose begin_pose;
-    double lap_proximity_meters;
-    int min_snapshots_in_lap;
-    std::string publish_frame;
+    // Store snapshots and their corresponding path_map poses (defined as their timestamp)
+    std::vector<std::tuple<rclcpp::Time, geometry_msgs::msg::Pose, Cloud>> snapshots;
+
+    geometry_msgs::msg::Pose begin_pose;
 
     // Needed to find translation for triggering snapshot-taking code
-    geometry_msgs::Pose last_snapshot_pose;
-    double distance_for_snapshot = 0.1; // meters
+    geometry_msgs::msg::Pose last_snapshot_pose;
+
+    std::string publish_frame;
 
 public:
-    virtual void onInit() 
+    explicit LandmarkGraph(const rclcpp::NodeOptions& options)
+	: Node("LandmarkGraph", rclcpp::NodeOptions(options).use_intra_process_comms(true))
     {
-        NODELET_DEBUG("Creating subscribers and publishers");
+        RCLCPP_DEBUG(this->get_logger(), "Creating subscribers and publishers");
         
-        n_ = getPrivateNodeHandle();
-        path_sub = n_.subscribe("path", 1, &LandmarkGraph::pathcb, this);
-        cloud_sub = n_.subscribe("cloud", 1, &LandmarkGraph::cloudcb, this);
-        cum_path_pub = n_.advertise<sensor_msgs::PointCloud2>("cum_path", 1, true);
+        path_sub = create_subscription<nav_msgs::msg::Path>("path", 1, 
+            std::bind(&LandmarkGraph::pathcb, this, std::placeholders::_1));
+        cloud_sub = create_subscription<sensor_msgs::msg::PointCloud2>("cloud", 1, 
+            std::bind(&LandmarkGraph::cloudcb, this, std::placeholders::_1));
+        cum_path_pub = create_publisher<sensor_msgs::msg::PointCloud2>("cum_path",
+            rclcpp::QoS(rclcpp::KeepLast(1), latched_map_data_profile));
 
-        n_.param("lap_proximity_meters", lap_proximity_meters, 4.0);
-        n_.param("min_snapshots_in_lap", min_snapshots_in_lap, 4);       
-        n_.param<std::string>("publish_frame", publish_frame, "map");        
+        declare_parameter("lap_proximity_meters", 4.0);
+        declare_parameter("min_snapshots_in_lap", 4);       
+        declare_parameter("publish_frame", "map"); 
+        declare_parameter("distance_for_snapshot", 0.1);    
 
         // This sucker needs to be inited after the node
-        tfListener = std::make_unique<tf2_ros::TransformListener>(tfBuffer);
+        tfBuffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+        tfListener = std::make_shared<tf2_ros::TransformListener>(*tfBuffer);
     }
 
     // Keep a queue of the most recent 10 Paths so when the (much slower)
     // pointcloud topic publishes, it can select the closest matching path from the queue
-    void pathcb(const nav_msgs::Path::ConstPtr &input)
+    void pathcb(const nav_msgs::msg::Path::ConstSharedPtr input)
     {
         std::lock_guard<std::mutex> scoped(paths_lock);
 
@@ -100,7 +123,7 @@ public:
         if(input->header.stamp.sec < paths.back()->header.stamp.sec)
             return;
         else if(input->header.stamp.sec == paths.back()->header.stamp.sec && 
-                input->header.stamp.nsec < paths.back()->header.stamp.nsec)
+                input->header.stamp.nanosec < paths.back()->header.stamp.nanosec)
             return;
 
         // insert
@@ -110,8 +133,14 @@ public:
             paths.pop_front();
     }
 
-    void cloudcb(const sensor_msgs::PointCloud2::ConstPtr &cloud)
+    void cloudcb(const sensor_msgs::msg::PointCloud2::UniquePtr cloud)
     {
+
+        double lap_proximity_meters = get_parameter("lap_proximity_meters").as_double();
+        int min_snapshots_in_lap = get_parameter("min_snapshots_in_lap").as_int();
+        publish_frame = get_parameter("publish_frame").as_string();
+        double distance_for_snapshot = get_parameter("distance_for_snapshot").as_double(); // meters
+
         if (!accumulate_mode)
             return;
 
@@ -119,8 +148,8 @@ public:
         // then extract the last pose from that path message
         // This pose most closely aligns with there the camera was when the
         // cones were observed
-        nav_msgs::PathConstPtr current_path;
-        geometry_msgs::PoseStamped current_pose;
+        nav_msgs::msg::Path::ConstSharedPtr current_path;
+        geometry_msgs::msg::PoseStamped current_pose;
         {
             std::lock_guard<std::mutex> scoped(paths_lock);
 
@@ -129,21 +158,13 @@ public:
                 return;
             }
 
-            const auto lessThan = [](ros::Time a, ros::Time b) {
-                if(a.sec < b.sec)
-                    return true;
-                if(a.sec == b.sec && a.nsec < b.nsec)
-                    return true;
-                return false;
-            };
-
             for(int i = paths.size() - 1; ; i--) {
                 if (i < 0) {
                     // either 'paths' is empty or there are no paths before `cloud`
                     return;
                 }
 
-                if(lessThan(paths.at(i)->header.stamp, cloud->header.stamp)) {
+                if(rclcpp::Time(paths.at(i)->header.stamp) < rclcpp::Time(cloud->header.stamp)) {
                     current_path = paths.at(i);
                     current_pose = paths.at(i)->poses.back();
                     break;
@@ -167,7 +188,7 @@ public:
             return;
         } */
         // TODO remove so this only happens once
-        cum_path_pub.publish(compute_final_map(current_path));
+        publish_final_map(current_path);
         
         if (distance_from_last > distance_for_snapshot)
             last_snapshot_pose = current_pose.pose;
@@ -175,10 +196,10 @@ public:
             return;
 
         // convert from cloud frame to camera pose frame
-        geometry_msgs::TransformStamped cloud_to_cam;
+        geometry_msgs::msg::TransformStamped cloud_to_cam;
         try {
 
-            cloud_to_cam = tfBuffer.lookupTransform(
+            cloud_to_cam = tfBuffer->lookupTransform(
                 current_pose.header.frame_id,   // dest (map)
                 cloud->header.frame_id,         // source (zed2_left_camera_optical_frame)
                 cloud->header.stamp);
@@ -187,8 +208,10 @@ public:
             // "\ntf: " << transformStamped << std::endl;
 
         } catch (tf2::TransformException &ex) {
-            ROS_WARN("[Landmark Graph Error] %s", ex.what());
-            ros::Duration(1.0).sleep();
+            RCLCPP_WARN(this->get_logger(), "[Landmark Graph Error] %s", ex.what());
+            // lmao the github issues for this in ros2 was such a fun rabbit hole 
+            // although Clock::sleep_for was implemented in 2021, it didn;t make it into foxy
+            // rclcpp::Time(1.0 * 10e9).sleep();
             return;
         }
 
@@ -196,10 +219,12 @@ public:
 	    pcl::fromROSMsg(*cloud, *cloud_pcl);
         const Cloud::Ptr cloud_pcl_const(cloud_pcl);
 
-        Cloud cloud_transformed;
-        pcl_ros::transformPointCloud(*cloud_pcl_const, cloud_transformed, cloud_to_cam.transform);
+        Eigen::Affine3d c2ctEigen = tf2::transformToEigen(cloud_to_cam);
 
-        NODELET_INFO("[Landmark Graph] Storing new snapshot of size %lu", cloud_transformed.size());
+        Cloud cloud_transformed;
+        pcl::transformPointCloud(*cloud_pcl_const, cloud_transformed, c2ctEigen);
+
+        RCLCPP_INFO(get_logger(), "[Landmark Graph] Storing new snapshot of size %lu", cloud_transformed.size());
         snapshots.emplace_back(std::make_tuple(
             current_path->header.stamp, 
             current_pose.pose, 
@@ -208,7 +233,7 @@ public:
 
 private:
 
-    sensor_msgs::PointCloud2 compute_final_map(nav_msgs::PathConstPtr path) {        
+    void publish_final_map(nav_msgs::msg::Path::ConstSharedPtr path) {        
         auto curr_path_entry = path->poses.begin();
 
         Cloud::Ptr accum_landmarks(new Cloud);
@@ -222,69 +247,57 @@ private:
             const auto& cloud = std::get<2>(tuple);
 
             // find corrected pose with the same stamp as snapshot pose
-            while (!equal(stamp, curr_path_entry->header.stamp)) {
+            while (stamp != rclcpp::Time(curr_path_entry->header.stamp)) {
                 curr_path_entry++;
 
                 if (curr_path_entry == path->poses.end()) {
                     // ran out of paths (should not happen)
-                    ROS_WARN_STREAM_NAMED("Landmark Graph", "In parsing path_map data, could not find "
+                    RCLCPP_WARN_STREAM(get_logger(), "In parsing path_map data, could not find "
                                         "corresponding poses for all snapshots"); 
-                    return sensor_msgs::PointCloud2();
+                    return;
                 }
             }
 
             // get current pose (global static frame)
             const auto& curr_pose = curr_path_entry->pose;
-            tf::Pose tfpose, tfcurr_pose;
+            tf2::Transform tfpose, tfcurr_pose;
             // convert snapshot pose and curr_pose to tf::Pose for its inverse() function
-            tf::poseMsgToTF(pose, tfpose);
-            tf::poseMsgToTF(curr_pose, tfcurr_pose);
+            tf2::fromMsg(pose, tfpose);
+            tf2::fromMsg(curr_pose, tfcurr_pose);
 
             // Get disparity between recorded pose and corrected pose
-            const auto &disparity = tfpose.inverseTimes(tfcurr_pose);
+            const tf2::Transform disparity = tfpose.inverseTimes(tfcurr_pose);
+            Eigen::Affine3d disparityEigen = tf2::transformToEigen(tf2::toMsg(disparity));
+            
             
             // transform snapshot pointcloud by disparity
             Cloud cloud_transformed;
-            pcl_ros::transformPointCloud(cloud, cloud_transformed, disparity);
+            pcl::transformPointCloud(cloud, cloud_transformed, disparityEigen);
 
             // add corrected pointcloud to Mother
             accum_landmarks->operator+=(cloud_transformed);
 
-            ROS_DEBUG_STREAM_NAMED("Landmark Graph", "Append cum path; points: " << cloud_transformed.size());
+            RCLCPP_DEBUG_STREAM(get_logger(), "Append cum path; points: " << cloud_transformed.size());
         }
 
-        ROS_DEBUG_STREAM_NAMED("Landmark Graph", "Publish cum path; sipointsze: " << accum_landmarks->size());
+        RCLCPP_DEBUG_STREAM(get_logger(), "Publish cum path; sipointsze: " << accum_landmarks->size());
 
         // convert accum_landmarks to ros message
-        sensor_msgs::PointCloud2 publish_cloud;
-        pcl::toROSMsg(*accum_landmarks, publish_cloud);
-        publish_cloud.header.stamp = ros::Time(0); // now
-        publish_cloud.header.frame_id = publish_frame;
+        sensor_msgs::msg::PointCloud2::UniquePtr publish_cloud(new sensor_msgs::msg::PointCloud2);
+        pcl::toROSMsg(*accum_landmarks, *publish_cloud);
+        publish_cloud->header.stamp = rclcpp::Time(0); // now
+        publish_cloud->header.frame_id = publish_frame;
 
-        return publish_cloud;
+        cum_path_pub->publish(std::move(publish_cloud));
     }
 
-    double dist(geometry_msgs::Point a, geometry_msgs::Point b) {
+    double dist(geometry_msgs::msg::Point a, geometry_msgs::msg::Point b) {
         return std::sqrt(
             ((a.x - b.x) * (a.x - b.x)) + 
             ((a.y - b.y) * (a.y - b.y)) +
             ((a.z - b.z) * (a.z - b.z)));
     }
-
-    bool lessThan(ros::Time a, ros::Time b) {
-        if(a.sec < b.sec)
-            return true;
-        if(a.sec == b.sec && a.nsec < b.nsec)
-            return true;
-        return false;
-    };
-
-    bool equal(ros::Time a, ros::Time b) {
-        return (a.sec == b.sec && a.nsec == b.nsec);
-    };
-    
 };
 
-}
-
-PLUGINLIB_EXPORT_CLASS(LandmarkGraph::LandmarkGraph, nodelet::Nodelet);
+#include "rclcpp_components/register_node_macro.hpp"
+RCLCPP_COMPONENTS_REGISTER_NODE(LandmarkGraph)

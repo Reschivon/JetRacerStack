@@ -3,50 +3,49 @@
 #include <memory>
 #include <rclcpp/rclcpp.hpp>
 
-#include <Eigen/Dense>
-#include <geometry_msgs/msg/PointStamped.hpp>
-
 #include <pcl/PCLPointCloud2.h>
 #include <pcl/ModelCoefficients.h>
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl/common/centroid.h>
-
-#include <sensor_msgs/msgs/PointCloud2.hpp>
 #include <pcl_conversions/pcl_conversions.h>
 
+#include <geometry_msgs/msg/point_stamped.hpp>
+#include <sensor_msgs/msg/point_cloud2.hpp>
 
 class PlanarCluster : public rclcpp::Node
 {
 
 private:
-    rclcpp::Subscription<sensor_msgs::msgs::PointCloud2>::SharedPtr cloud_sub;
-    rclcpp::Publisher<sensor_msgs::msgs::PointCloud2>::SharedPtr cloud_pub;
-
-    double tolerance;
-    int minSize, maxSize;
+    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr cloud_sub;
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr cloud_pub;
 
 public:
-    COMPOSITION_PUBLIC
-    explicit PlanarCluster(const rclcpp::NodeOptions & options)
-	: Node("PlanarCluster", options)
+    explicit PlanarCluster(const rclcpp::NodeOptions& options)
+	: Node("PlanarCluster", rclcpp::NodeOptions(options).use_intra_process_comms(true))
     {
-        NODELET_DEBUG("Creating subscribers and publishers");
-        
+        RCLCPP_DEBUG(this->get_logger(), "Creating subscribers and publishers");
 
-        cloud_sub = create_subscription("input", 10, 
-				std::bind(&PlanarCluster::cloudcb, this, std::placeholders::_1));
-        cloud_pub = create_publisher<sensor_msgs::msgs::PointCloud2>("output", 1);
+        cloud_sub = create_subscription<sensor_msgs::msg::PointCloud2>("input", 10, 
+                std::bind(&PlanarCluster::cloudcb, this, std::placeholders::_1));
+        cloud_pub = create_publisher<sensor_msgs::msg::PointCloud2>("output", 1);
 
-        n_.param("tolerance", tolerance, 0.1);
-        n_.param("minSize", minSize, 3);
-        n_.param("maxSize", maxSize, 100);
+        declare_parameter("tolerance", 0.1);
+        declare_parameter("minSize", 3);
+        declare_parameter("maxSize", 100);
     }
 
     // this function gets called every time new pcl data comes in
-    void cloudcb(const sensor_msgs::msgs::PointCloud2::SharedPtr input)
+    void cloudcb(const sensor_msgs::msg::PointCloud2::UniquePtr input)
     {
+        double tolerance;
+        int minSize, maxSize;
+
+        tolerance = get_parameter("tolerance").as_double();
+        minSize = get_parameter("minSize").as_int();
+        maxSize = get_parameter("maxSize").as_int();
+
      	/* NODELET_INFO(
 	          "[%s::input_indices_callback] PointCloud with %d data points and frame %s on "
 	          "topic %s received.",
@@ -72,7 +71,7 @@ public:
 
 
         int number_clusters = (int) cluster_indices.size();
-        NODELET_DEBUG("Number of clusters found: %d", number_clusters);
+        RCLCPP_DEBUG(this->get_logger(), "Number of clusters found: %d", number_clusters);
             
         // We will fill this cloud with centroids
         pcl::PointCloud<pcl::PointXYZ> centroids;
@@ -99,14 +98,15 @@ public:
             centroids.points.push_back(centroid_point);
         }
         
-        sensor_msgs::PointCloud2 publish_cloud;
-        pcl::toROSMsg(centroids, publish_cloud);
+        sensor_msgs::msg::PointCloud2::UniquePtr publish_cloud(new sensor_msgs::msg::PointCloud2());
+        pcl::toROSMsg(centroids, *publish_cloud);
         
-        publish_cloud.header.stamp = input->header.stamp;
-        publish_cloud.header.frame_id = input->header.frame_id;
+        publish_cloud->header.stamp = input->header.stamp;
+        publish_cloud->header.frame_id = input->header.frame_id;
 
-        cloud_pub.publish(boost::make_shared<sensor_msgs::PointCloud2>(publish_cloud));
+        cloud_pub->publish(std::move(publish_cloud));
     }
 };
 
-PLUGINLIB_EXPORT_CLASS(PlanarCluster::PlanarCluster, nodelet::Nodelet);
+#include "rclcpp_components/register_node_macro.hpp"
+RCLCPP_COMPONENTS_REGISTER_NODE(PlanarCluster)

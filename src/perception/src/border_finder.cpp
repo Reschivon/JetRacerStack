@@ -1,9 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <memory>
-#include <ros/ros.h>
-#include <nodelet/nodelet.h>
-#include <pluginlib/class_list_macros.h>
+#include <rclcpp/rclcpp.hpp>
 
 #include <boost/assign/list_of.hpp>
 
@@ -12,53 +10,69 @@
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types_conversion.h>
-
-#include <sensor_msgs/PointCloud2.h>
 #include <pcl_conversions/pcl_conversions.h>
-#include <nav_msgs/OccupancyGrid.h>
+
 #include <tf2/LinearMath/Quaternion.h>
+
+#include <geometry_msgs/msg/point_stamped.hpp>
+#include <sensor_msgs/msg/point_cloud2.hpp>
+#include <nav_msgs/msg/occupancy_grid.hpp>
 
 #include <opencv2/imgproc.hpp>
 #include "opencv2/highgui.hpp"
 #include "delaunator.hpp"
 
-namespace BorderFinder {
+static const rmw_qos_profile_t latched_map_data_profile =
+{
+  RMW_QOS_POLICY_HISTORY_KEEP_LAST,
+  5,
+  RMW_QOS_POLICY_RELIABILITY_RELIABLE,
+  RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL,
+  RMW_QOS_DEADLINE_DEFAULT,
+  RMW_QOS_LIFESPAN_DEFAULT,
+  RMW_QOS_POLICY_LIVELINESS_SYSTEM_DEFAULT,
+  RMW_QOS_LIVELINESS_LEASE_DURATION_DEFAULT,
+  false
+};
 
-class BorderFinder : public nodelet::Nodelet
+class BorderFinder : public rclcpp::Node
 {
 
 private:
-    ros::NodeHandle n_;
-    ros::Subscriber cloud_sub;
-    ros::Publisher cloud_pub;
-
-    double track_width, cone_spacing;
-    double deviation_ratio, resolution;
+    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr cloud_sub;
+    rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr cloud_pub;
 
     using Point = pcl::PointXYZ;
     using Cloud = pcl::PointCloud<Point>;
 
 public:
-    virtual void onInit() 
+    explicit BorderFinder(const rclcpp::NodeOptions& options)
+	: Node("BorderFinder", rclcpp::NodeOptions(options).use_intra_process_comms(true))
     {
-        NODELET_DEBUG("Creating subscribers and publishers");
+        RCLCPP_DEBUG(this->get_logger(), "Creating subscribers and publishers");
         
-        n_ = getPrivateNodeHandle();
-        cloud_sub = n_.subscribe("input", 10, &BorderFinder::cloudcb, this);
-        cloud_pub = n_.advertise<nav_msgs::OccupancyGrid>("output", 1, true);
+        cloud_sub = create_subscription<sensor_msgs::msg::PointCloud2>("input", 10, 
+                std::bind(&BorderFinder::cloudcb, this, std::placeholders::_1));
+        cloud_pub = create_publisher<nav_msgs::msg::OccupancyGrid>("output", 
+                rclcpp::QoS(rclcpp::KeepLast(1), latched_map_data_profile));
 
-        n_.param("track_width", track_width, 0.2);
-        n_.param("cone_spacing", cone_spacing, 0.15);
-        n_.param("deviation_ratio", deviation_ratio, 0.2);
-        n_.param("resolution", resolution, 0.03);
+        declare_parameter("track_width", 0.2);
+        declare_parameter("cone_spacing", 0.15);
+        declare_parameter("deviation_ratio", 0.2);
+        declare_parameter("resolution", 0.03);
     }
 
-    void cloudcb(const sensor_msgs::PointCloud2::ConstPtr &input) {
+    void cloudcb(const sensor_msgs::msg::PointCloud2::UniquePtr input) {
+        double track_width = get_parameter("track_width").as_double();
+        double cone_spacing = get_parameter("cone_spacing").as_double();
+        double deviation_ratio = get_parameter("deviation_ratio").as_double();
+        double resolution = get_parameter("resolution").as_double();
+    
         Cloud cloud;
 	    pcl::fromROSMsg(*input, cloud);
 
         if (cloud.empty()) {
-            NODELET_WARN_STREAM_NAMED("Border Finder", "Received a landmark cloud with no points, ignoring");
+            RCLCPP_WARN_STREAM(get_logger(), "Received a landmark cloud with no points, ignoring");
             return;
         }
 
@@ -137,7 +151,7 @@ public:
         cv::imwrite("immmmm.png", occupancy);
 
         // Copy the cv matrix to occupancy grid
-        nav_msgs::OccupancyGridPtr map = nav_msgs::OccupancyGridPtr(new nav_msgs::OccupancyGrid());
+        nav_msgs::msg::OccupancyGrid::UniquePtr map(new nav_msgs::msg::OccupancyGrid());
         
         // Copy the image data into the map structure
         map->info.width = occupancy.cols;
@@ -160,7 +174,7 @@ public:
         map->header.frame_id = "map";
 
         std::cout << "PUBLISHEDD!!!!" << std::endl;
-        cloud_pub.publish(map);
+        cloud_pub->publish(std::move(map));
     }
 
 private:
@@ -172,6 +186,6 @@ private:
     
 };
 
-}
 
-PLUGINLIB_EXPORT_CLASS(BorderFinder::BorderFinder, nodelet::Nodelet);
+#include "rclcpp_components/register_node_macro.hpp"
+RCLCPP_COMPONENTS_REGISTER_NODE(BorderFinder)

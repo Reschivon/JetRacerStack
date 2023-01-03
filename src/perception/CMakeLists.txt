@@ -38,24 +38,24 @@ include_directories(${PCL_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
+# Create new target for planar_cluster
+add_library(planar_cluster src/planar_cluster.cpp)
+ament_target_dependencies(planar_cluster rclcpp rclcpp_components sensor_msgs)
+target_link_libraries(planar_cluster ${PCL_LIBRARIES})
+
 # Create new target for color_cluster
 add_library(color_cluster src/color_cluster.cpp)
 ament_target_dependencies(color_cluster rclcpp rclcpp_components sensor_msgs)
 target_link_libraries(color_cluster ${PCL_LIBRARIES})
 
-# Create new target for color_cluster
-add_library(planar_cluster src/planar_cluster.cpp)
-ament_target_dependencies(planar_cluster rclcpp rclcpp_components sensor_msgs)
-target_link_libraries(planar_cluster ${PCL_LIBRARIES})
-
 # Create new target for landmark_graph
 add_library(landmark_graph src/landmark_graph.cpp)
-ament_target_dependencies(landmark_graph rclcpp rclcpp_components geometry_msgs)
+ament_target_dependencies(landmark_graph rclcpp rclcpp_components geometry_msgs sensor_msgs nav_msgs)
 target_link_libraries(landmark_graph ${PCL_LIBRARIES})
 
 # Create new target for border_finder
 add_library(border_finder src/border_finder.cpp)
-ament_target_dependencies(border_finder rclcpp rclcpp_components cv_bridge geometry_msgs)
+ament_target_dependencies(border_finder rclcpp rclcpp_components cv_bridge geometry_msgs nav_msgs)
 target_link_libraries(border_finder ${PCL_LIBRARIES} ${OpenCV_LIBS})
 
 install(TARGETS
