@@ -1,0 +1,149 @@
+<?xml version="1.0"?>
+
+<launch>
+
+    <!-- Launch rivz display -->
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find perception)/zed_rviz.rviz" output="screen" />
+
+    <!-- View debug messages -->
+    <!-- <node name="rqt_gui" pkg="rqt_console" type="rqt_console"/> -->
+
+    <arg name="use_rosbag"           default="true" />
+    <arg name="svo_file"             default="" /> <!-- <arg name="svo_file" default="path/to/svo/file.svo"> -->
+    <arg name="stream"               default="" /> <!-- <arg name="stream" default="<ip_address>:<port>"> -->
+
+    <arg name="node_name"            default="zed_node" />
+    <arg name="camera_model"         default="zed2" />
+
+    <arg name="camera_name"          default="zed2" />
+
+    <arg name="base_frame"           default="base_link" />
+
+    <arg name="cam_pos_x"             default="0.0" /> <!-- Position respect to base frame (i.e. "base_link) -->
+    <arg name="cam_pos_y"             default="0.0" /> <!-- Position respect to base frame (i.e. "base_link) -->
+    <arg name="cam_pos_z"             default="0.0" /> <!-- Position respect to base frame (i.e. "base_link) -->
+    <arg name="cam_roll"              default="0.0" /> <!-- Orientation respect to base frame (i.e. "base_link) -->
+    <arg name="cam_pitch"             default="0.0" /> <!-- Orientation respect to base frame (i.e. "base_link) -->
+    <arg name="cam_yaw"               default="0.0" /> <!-- Orientation respect to base frame (i.e. "base_link) -->
+
+    <!-- Nodelet Manager -->
+    <node pkg="nodelet" type="nodelet" name="nodelet_manager" args="manager" output="screen" />
+
+    <group unless="$(arg use_rosbag)">
+
+        <!-- ROS URDF description of the ZED -->
+        <param name="$(arg camera_name)_description"
+               command="$(find xacro)/xacro '$(find zed_wrapper)/urdf/zed_descr.urdf.xacro'
+                        camera_name:=$(arg camera_name)
+                        camera_model:=$(arg camera_model)
+                        base_frame:=$(arg base_frame)
+                        cam_pos_x:=$(arg cam_pos_x)
+                        cam_pos_y:=$(arg cam_pos_y)
+                        cam_pos_z:=$(arg cam_pos_z)
+                        cam_roll:=$(arg cam_roll)
+                        cam_pitch:=$(arg cam_pitch)
+                        cam_yaw:=$(arg cam_yaw)"
+        />
+
+        <node name="$(arg camera_name)_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" output="screen" required="true">
+            <remap from="robot_description" to="$(arg camera_name)_description" />
+        </node>
+
+        <!-- Main zed thing -->
+        <node pkg="nodelet" type="nodelet" name="$(arg node_name)" args="load zed_nodelets/ZEDWrapperNodelet nodelet_manager" output="screen">
+            <rosparam file="$(find zed_wrapper)/params/common.yaml" command="load" />
+            <rosparam file="$(find zed_wrapper)/params/zed2.yaml" command="load" />
+
+            <!-- Camera name -->
+            <param name="general/camera_name"               value="$(arg camera_name)" />
+
+            <!-- Base frame -->
+            <param name="general/base_frame"                value="$(arg base_frame)" />
+
+            <!-- SVO file path -->
+            <param name="svo_file"                          value="$(arg svo_file)" />
+
+            <!-- Remote stream -->
+            <param name="stream"                            value="$(arg stream)" />
+
+            <!-- Camera ID -->
+            <param name="general/zed_id"                    value="0" />
+
+            <!-- GPU ID -->
+            <param name="general/gpu_id"                    value="0" />
+
+            <param name="sensors/sensors_timestamp_sync"    value="true" />
+            <param name="pos_tracking/area_memory"          value="true" />
+
+            <!-- Note: when the FPS is higher than the device can handle, the internal ZED
+                software will erroneously introduce a noticeable skew in the color data.
+                Incredibly annoying  -->
+            <param name="grab_frame_rate"                   value="2" />
+
+            <!-- Ok we're gonna use depth_image_proc to get the pointcloud ourselves
+                So this is not neccessary anymore but we can't turn it off either-->
+            <param name="point_cloud_freq"                  value="0.1" />
+            <param name="pub_frame_rate"                    value="2" />
+            
+            <param name="depth/sensing_mode"                value="1" /> <!-- fill -->
+            
+        </node>
+    </group> 
+
+    <group if="$(arg use_rosbag)">
+        <node name="play_rosbag" pkg="rosbag" type="play" output="log" args="--clock $(find perception)/../bagfiles/velodyne_pc4.bag" />
+    </group>
+
+    <!-- Convert depth image to pointcloud -->
+    <node name="depth_to_pc" pkg="nodelet" type="nodelet" args="load depth_image_proc/point_cloud_xyzrgb nodelet_manager" output="screen">
+        <remap from="rgb/camera_info" to="$(arg node_name)/rgb/camera_info" />
+        <remap from="rgb/image_rect_color" to="$(arg node_name)/rgb/image_rect_color" />
+        <remap from="depth_registered/image_rect" to="$(arg node_name)/depth/depth_registered" />
+
+        <remap from="depth_registered/points" to="$(arg node_name)/imitation_pointcloud" />
+
+        <!-- Holy shit this took so long. point_cloud_xyzrgb uses an ApproximateTime policy which syncs messages over arbitrary timestamps
+             But this POS was stalling after <queue_size> messages. So I forked the github repo, modified it to use TimeSynchronizer
+             (as pc and depth share a timestamp) and finally it works -->
+        <param name="queue_size" value="10" />
+    </node>
+
+    <!-- Filter pointcloud for Cones -->
+    <include file="$(find perception)/color_cone_finder.launch">
+        <arg name="pointcloud_topic" value="/zed_node/imitation_pointcloud" />
+        <arg name="conecloud_topic" value="local_cone_cloud" />
+    </include> 
+
+    <!-- Store Cone positions at incremental positions -->
+    <node pkg="nodelet" type="nodelet" name="landmark_accum" args="load perception/LandmarkGraph nodelet_manager" output="screen">
+        <remap from="~path" to="/zed_node/path_map" />
+        <remap from="~cloud" to="local_cone_cloud" />
+        <remap from="~cum_path" to="cum_corrected_cloud" />
+
+        <param name="publish_frame" value="map" />
+    </node> 
+
+    <node pkg="nodelet" type="nodelet" name="final_cones_cluster" args="load perception/PlanarCluster nodelet_manager" output="screen">
+        <remap from="~input" to="cum_corrected_cloud" />
+        <remap from="~output" to="corrected_cones" />
+
+        <rosparam>
+            tolerance: 0.06
+            minSize: 3
+            maxSize: 40
+        </rosparam>
+    </node>
+
+    <node pkg="nodelet" type="nodelet" name="borders" args="load perception/BorderFinder nodelet_manager" output="screen">
+        <remap from="~input" to="corrected_cones" />
+        <remap from="~output" to="drivable_map" />
+
+        <rosparam>
+            track_width: 0.3048 <!-- 12 in -->
+            cone_spacing: 0.254 <!-- 10 in -->
+            deviation_ratio: 0.9 <!-- allowed, so [80%, 120%]-->
+            resolution: 0.01
+        </rosparam>
+    </node>
+
+</launch>

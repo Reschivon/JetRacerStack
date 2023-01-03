@@ -6,3 +6,4 @@ JetRacerStack.code-workspace
 frames*
 install/
 log/
+*.pyc
