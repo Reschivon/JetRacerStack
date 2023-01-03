@@ -1,13 +1,10 @@
 #include <iostream>
 #include <fstream>
 #include <memory>
-#include <ros/ros.h>
-#include <nodelet/nodelet.h>
-#include <pluginlib/class_list_macros.h>
+#include <rclcpp/rclcpp.hpp>
 
 #include <Eigen/Dense>
-#include <tf/transform_broadcaster.h>
-#include <geometry_msgs/PointStamped.h>
+#include <geometry_msgs/msg/PointStamped.hpp>
 
 #include <pcl/PCLPointCloud2.h>
 #include <pcl/ModelCoefficients.h>
@@ -16,30 +13,31 @@
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl/common/centroid.h>
 
-#include <sensor_msgs/PointCloud2.h>
+#include <sensor_msgs/msgs/PointCloud2.hpp>
 #include <pcl_conversions/pcl_conversions.h>
 
-namespace PlanarCluster {
-class PlanarCluster : public nodelet::Nodelet
+
+class PlanarCluster : public rclcpp::Node
 {
 
 private:
-    ros::NodeHandle n_;
-    ros::Subscriber cloud_sub;
-    ros::Publisher cloud_pub;
-    unsigned int seq = 0;
+    rclcpp::Subscription<sensor_msgs::msgs::PointCloud2>::SharedPtr cloud_sub;
+    rclcpp::Publisher<sensor_msgs::msgs::PointCloud2>::SharedPtr cloud_pub;
 
     double tolerance;
     int minSize, maxSize;
 
 public:
-    virtual void onInit() 
+    COMPOSITION_PUBLIC
+    explicit PlanarCluster(const rclcpp::NodeOptions & options)
+	: Node("PlanarCluster", options)
     {
         NODELET_DEBUG("Creating subscribers and publishers");
         
-        n_ = getPrivateNodeHandle();
-        cloud_sub = n_.subscribe("input", 10, &PlanarCluster::cloudcb, this);
-        cloud_pub = n_.advertise<sensor_msgs::PointCloud2>("output", 1);
+
+        cloud_sub = create_subscription("input", 10, 
+				std::bind(&PlanarCluster::cloudcb, this, std::placeholders::_1));
+        cloud_pub = create_publisher<sensor_msgs::msgs::PointCloud2>("output", 1);
 
         n_.param("tolerance", tolerance, 0.1);
         n_.param("minSize", minSize, 3);
@@ -47,7 +45,7 @@ public:
     }
 
     // this function gets called every time new pcl data comes in
-    void cloudcb(const sensor_msgs::PointCloud2::ConstPtr &input)
+    void cloudcb(const sensor_msgs::msgs::PointCloud2::SharedPtr input)
     {
      	/* NODELET_INFO(
 	          "[%s::input_indices_callback] PointCloud with %d data points and frame %s on "
@@ -110,7 +108,5 @@ public:
         cloud_pub.publish(boost::make_shared<sensor_msgs::PointCloud2>(publish_cloud));
     }
 };
-
-}
 
 PLUGINLIB_EXPORT_CLASS(PlanarCluster::PlanarCluster, nodelet::Nodelet);
