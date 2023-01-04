@@ -6,9 +6,17 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 from ament_index_python.packages import get_package_share_directory
 
+USE_ROSBAG = False
+
 def generate_launch_description():
     """Generate launch description with multiple components."""
-    nodes = [
+    nodes = []
+    if USE_ROSBAG:
+        nodes.append(
+            Node(
+                
+            )
+        )
         Node(
             name='rviz',
             package='rviz2',

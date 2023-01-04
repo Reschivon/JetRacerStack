@@ -10,7 +10,7 @@
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types_conversion.h>
-#include <pcl_conversions/pcl_conversions.h>
+#include <pcl/conversions.h>
 
 #include <tf2/LinearMath/Quaternion.h>
 
@@ -21,6 +21,8 @@
 #include <opencv2/imgproc.hpp>
 #include "opencv2/highgui.hpp"
 #include "delaunator.hpp"
+
+#include "dirty_conversions.hpp"
 
 static const rmw_qos_profile_t latched_map_data_profile =
 {
@@ -34,6 +36,7 @@ static const rmw_qos_profile_t latched_map_data_profile =
   RMW_QOS_LIVELINESS_LEASE_DURATION_DEFAULT,
   false
 };
+
 
 class BorderFinder : public rclcpp::Node
 {
@@ -69,7 +72,7 @@ public:
         double resolution = get_parameter("resolution").as_double();
     
         Cloud cloud;
-	    pcl::fromROSMsg(*input, cloud);
+	    dirty_conversion::fromROSMsg(*input, cloud);
 
         if (cloud.empty()) {
             RCLCPP_WARN_STREAM(get_logger(), "Received a landmark cloud with no points, ignoring");

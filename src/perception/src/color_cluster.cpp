@@ -12,10 +12,11 @@
 #include <pcl/common/centroid.h>
 #include <pcl/point_types_conversion.h>
 #include <pcl/filters/conditional_removal.h>
-#include <pcl_conversions/pcl_conversions.h>
 
 #include <geometry_msgs/msg/point_stamped.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
+
+#include "dirty_conversions.hpp"
 
 template <typename PointT>
 class ConditionThresholdHSV : public pcl::ConditionBase<PointT>
@@ -137,7 +138,7 @@ public:
 	      
         // Convert PointCloud2 and store in reference of boost_ptr<pcl pointcloud>
         CloudPtr cloudRGB(new pcl::PointCloud<Point>);
-	      pcl::fromROSMsg(*input, *cloudRGB);
+	      dirty_conversion::fromROSMsg(*input, *cloudRGB);
 
         /* NODELET_INFO(
 	          "[%s::cloudcd] Initial size: %lu",
@@ -157,7 +158,7 @@ public:
 	          getName().c_str(), filtered->size()); */
         
         sensor_msgs::msg::PointCloud2::UniquePtr publish_cloud(new sensor_msgs::msg::PointCloud2());
-        pcl::toROSMsg(*filtered, *publish_cloud);
+        dirty_conversion::toROSMsg(*filtered, *publish_cloud);
         
         publish_cloud->header.stamp = input->header.stamp;
         publish_cloud->header.frame_id = input->header.frame_id;

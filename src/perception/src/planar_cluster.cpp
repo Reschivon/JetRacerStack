@@ -9,10 +9,11 @@
 #include <pcl/point_cloud.h>
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl/common/centroid.h>
-#include <pcl_conversions/pcl_conversions.h>
 
 #include <geometry_msgs/msg/point_stamped.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
+
+#include "dirty_conversions.hpp"
 
 class PlanarCluster : public rclcpp::Node
 {
@@ -53,7 +54,7 @@ public:
 	          input->header.frame_id.c_str(), n_.resolveName("input").c_str()); */
 	      
         pcl::PointCloud<pcl::PointXYZ>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZ>);
-	    pcl::fromROSMsg(*(input), *(cloud));
+	    dirty_conversion::fromROSMsg(*(input), *(cloud));
 	
         // create a vector for storing the indices of the clusters
         std::vector<pcl::PointIndices> cluster_indices;
@@ -99,7 +100,7 @@ public:
         }
         
         sensor_msgs::msg::PointCloud2::UniquePtr publish_cloud(new sensor_msgs::msg::PointCloud2());
-        pcl::toROSMsg(centroids, *publish_cloud);
+        dirty_conversion::toROSMsg(centroids, *publish_cloud);
         
         publish_cloud->header.stamp = input->header.stamp;
         publish_cloud->header.frame_id = input->header.frame_id;

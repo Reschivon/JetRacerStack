@@ -22,7 +22,6 @@
 #include <tf2_eigen/tf2_eigen.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
-#include <pcl_conversions/pcl_conversions.h>
 #include <pcl/common/transforms.h>
 
 #include <pcl/PCLPointCloud2.h>
@@ -34,6 +33,8 @@
 #include <geometry_msgs/msg/point_stamped.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <nav_msgs/msg/path.hpp>
+
+#include "dirty_conversions.hpp"
 
 static const rmw_qos_profile_t latched_map_data_profile =
 {
@@ -216,7 +217,7 @@ public:
         }
 
         Cloud::Ptr cloud_pcl(new pcl::PointCloud<Point>);
-	    pcl::fromROSMsg(*cloud, *cloud_pcl);
+	    dirty_conversion::fromROSMsg(*cloud, *cloud_pcl);
         const Cloud::Ptr cloud_pcl_const(cloud_pcl);
 
         Eigen::Affine3d c2ctEigen = tf2::transformToEigen(cloud_to_cam);
@@ -284,7 +285,7 @@ private:
 
         // convert accum_landmarks to ros message
         sensor_msgs::msg::PointCloud2::UniquePtr publish_cloud(new sensor_msgs::msg::PointCloud2);
-        pcl::toROSMsg(*accum_landmarks, *publish_cloud);
+        dirty_conversion::toROSMsg(*accum_landmarks, *publish_cloud);
         publish_cloud->header.stamp = rclcpp::Time(0); // now
         publish_cloud->header.frame_id = publish_frame;
 
